@@ -1,0 +1,62 @@
+stages:
+  # Stage 1: Download BBBC039 from Broad Institute (CC0, no auth required)
+  download:
+    cmd: python mlops/download_data.py
+    outs:
+      - data/raw/bbbc039
+
+  # Stage 2: Normalize images and load official BBBC039 train/val/test partitions
+  preprocess:
+    cmd: python mlops/preprocess.py
+    deps:
+      - data/raw/bbbc039
+    outs:
+      - data/processed/
+
+  # Stage 3: Benchmark pretrained StarDist vs Cellpose on BBBC039 validation split
+  # NOTE: This stage runs on the VALIDATION split only. Test split is never touched here.
+  benchmark_pretrained:
+    cmd: python mlops/benchmark.py
+    deps:
+      - data/processed/
+      - mlops/benchmark.py
+    metrics:
+      - metrics/pretrained_stardist.json:
+          cache: false
+      - metrics/cellpose_baseline.json:
+          cache: false
+
+  # Stage 4: Conditional fine-tuning.
+  # IMPORTANT: DVC does not evaluate metric thresholds. This stage is invoked
+  # explicitly by mlops/gate.py when the pretrained model fails the acceptance
+  # matrix. Do NOT run 'dvc repro train' directly — always use gate.py.
+  train:
+    cmd: python mlops/train.py
+    deps:
+      - data/processed/
+      - mlops/train.py
+      - mlops/configs/stardist_config.yaml
+    outs:
+      - backend/models/stardist_finetuned/
+
+  # Stage 5: One-time final test-set evaluation.
+  # Run ONCE after champion model is frozen. Never re-run to compare models.
+  final_eval:
+    cmd: python mlops/final_eval.py
+    deps:
+      - backend/models/
+      - data/processed/
+      - mlops/final_eval.py
+    metrics:
+      - metrics/final_test_eval.json:
+          cache: false
+
+  # Stage 6: ONNX benchmark (native TF vs ONNX Runtime, latency + RAM + equivalence)
+  benchmark_onnx:
+    cmd: python mlops/benchmark_onnx.py
+    deps:
+      - backend/models/
+      - mlops/benchmark_onnx.py
+    metrics:
+      - metrics/onnx_equivalence.json:
+          cache: false

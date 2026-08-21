@@ -1,0 +1,17 @@
+# StarDist 2D fine-tuning configuration
+# Values here override defaults in train.py
+# All values will be read by train.py at runtime
+
+n_rays: 32
+grid: [2, 2]
+train_patch_size: [256, 256]
+train_batch_size: 4
+train_epochs: 100
+train_steps_per_epoch: 100
+
+# Normalization (must match benchmark.py and inference)
+norm_pmin: 1.0
+norm_pmax: 99.8
+
+# NMS threshold tuning (done on val split after training)
+optimize_thresholds: true

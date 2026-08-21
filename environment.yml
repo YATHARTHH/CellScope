@@ -1,0 +1,45 @@
+name: cellscope
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    # --- Core ML stack (versions finalized after Phase 1 compatibility test) ---
+    - tensorflow          # Pin after compat test: StarDist + CSBDeep combo
+    - stardist            # Pin after test (CSBDeep requirement varies across releases)
+    - "csbdeep>=0.8.1"   # Must be 0.8.1+; 0.8.0 breaks pretrained model loading (#294)
+    - "cellpose>=3.0,<4.0"  # Pin to 3.x; Cellpose 4 removed models.Cellpose API
+    # --- ONNX (benchmark only; production path decided empirically) ---
+    - onnxruntime
+    - tf2onnx
+    # --- MLOps ---
+    - mlflow
+    - dvc
+    # --- Image I/O ---
+    - tifffile
+    - scikit-image
+    - numpy
+    # --- Visualization (local QA only — not embedded in web app) ---
+    - napari
+    # --- API ---
+    - fastapi
+    - "uvicorn[standard]"
+    - anyio
+    - python-multipart
+    - pillow
+    # --- Utilities ---
+    - hashlib2
+    - pytest
+    - httpx   # for pytest API client
+
+# ------------------------------------------------------------
+# IMPORTANT: After running the Phase 1 compatibility test:
+#   conda activate cellscope
+#   python -c "from stardist.models import StarDist2D; StarDist2D.from_pretrained('2D_versatile_fluo')"
+#   python -c "from cellpose import models; m = models.Cellpose(gpu=False, model_type='nuclei')"
+# Then freeze exact versions:
+#   pip freeze > environment_frozen.txt
+# And update this file with pinned ==x.y.z versions.
+# ------------------------------------------------------------
