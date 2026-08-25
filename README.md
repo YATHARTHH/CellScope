@@ -16,6 +16,7 @@ For complete end-to-end knowledge, architecture deep-dives, training formulas, a
 6. 🎯 **[Guide 6: Technical Interview Prep & System Design Q&A](file:///d:/cellscope/docs/06_interview_prep_and_system_design_qa.md)** — *Elevator pitch, technical Q&A, ML/CV math questions, backend system design, & 1M images/day cloud scaling.*
 7. 🚀 **[Guide 7: Deployment, Docker, CI/CD & Security](file:///d:/cellscope/docs/07_deployment_cicd_and_security.md)** — *Multi-stage Dockerfile, docker-compose, GitHub Actions CI pipeline, NGINX setup, & OWASP security.*
 8. 📡 **[Guide 8: Complete REST API Reference & OpenAPI Specs](file:///d:/cellscope/docs/08_api_reference_and_openapi_specs.md)** — *Full REST API endpoint schemas, request/response JSON payloads, status codes, & cURL examples.*
+9. ❓ **[Guide 9: Complete Project Glossary & FAQ](file:///d:/cellscope/docs/09_complete_project_glossary_and_faq.md)** — *A-to-Z domain glossary (biology, ML, web engineering) & 15 top frequently asked questions.*
 
 ---
 
