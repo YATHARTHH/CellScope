@@ -15,6 +15,7 @@ For complete end-to-end knowledge, architecture deep-dives, training formulas, a
 5. 🎓 **[Guide 5: Developer Onboarding & Mastery Guide](file:///d:/cellscope/docs/05_developer_onboarding_and_mastery_guide.md)** — *Codebase tree map, local setup steps, and developer extension recipes.*
 6. 🎯 **[Guide 6: Technical Interview Prep & System Design Q&A](file:///d:/cellscope/docs/06_interview_prep_and_system_design_qa.md)** — *Elevator pitch, technical Q&A, ML/CV math questions, backend system design, & 1M images/day cloud scaling.*
 7. 🚀 **[Guide 7: Deployment, Docker, CI/CD & Security](file:///d:/cellscope/docs/07_deployment_cicd_and_security.md)** — *Multi-stage Dockerfile, docker-compose, GitHub Actions CI pipeline, NGINX setup, & OWASP security.*
+8. 📡 **[Guide 8: Complete REST API Reference & OpenAPI Specs](file:///d:/cellscope/docs/08_api_reference_and_openapi_specs.md)** — *Full REST API endpoint schemas, request/response JSON payloads, status codes, & cURL examples.*
 
 ---
 
