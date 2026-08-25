@@ -14,6 +14,7 @@ For complete end-to-end knowledge, architecture deep-dives, training formulas, a
 4. 🛠️ **[Guide 4: Engineering Challenges & Solutions](file:///d:/cellscope/docs/04_engineering_challenges_and_solutions.md)** — *Real-world bugs faced (float32 array locks, PowerShell execution policy, HMR caching) and technical fixes.*
 5. 🎓 **[Guide 5: Developer Onboarding & Mastery Guide](file:///d:/cellscope/docs/05_developer_onboarding_and_mastery_guide.md)** — *Codebase tree map, local setup steps, and developer extension recipes.*
 6. 🎯 **[Guide 6: Technical Interview Prep & System Design Q&A](file:///d:/cellscope/docs/06_interview_prep_and_system_design_qa.md)** — *Elevator pitch, technical Q&A, ML/CV math questions, backend system design, & 1M images/day cloud scaling.*
+7. 🚀 **[Guide 7: Deployment, Docker, CI/CD & Security](file:///d:/cellscope/docs/07_deployment_cicd_and_security.md)** — *Multi-stage Dockerfile, docker-compose, GitHub Actions CI pipeline, NGINX setup, & OWASP security.*
 
 ---
 
