@@ -78,9 +78,12 @@ def promote_pretrained_as_champion() -> None:
 
 
 def invoke_finetuning() -> None:
-    """Invoke 'dvc repro train' to start fine-tuning."""
-    print("  [GATE] Invoking fine-tuning: dvc repro train")
-    result = subprocess.run(["dvc", "repro", "train"], check=False)
+    """Run fine-tuning directly via mlops.train (dvc repro equivalent)."""
+    print("  [GATE] Invoking fine-tuning: python -m mlops.train")
+    result = subprocess.run(
+        [sys.executable, "-m", "mlops.train"],
+        check=False,
+    )
     if result.returncode != 0:
         print("  [GATE] ERROR: Fine-tuning failed. Check logs above.")
         sys.exit(result.returncode)

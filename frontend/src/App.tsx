@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Microscope, Activity, Database, BarChart2, ShieldCheck } from 'lucide-react'
+import { Microscope, Activity, Database, BarChart2, ShieldCheck, Upload, Bot, FolderArchive, Cpu } from 'lucide-react'
 
 import { AnalysisResult, AuditRow, CellInstance, HealthStatus } from './types'
 import { ImageUploader } from './components/ImageUploader'
@@ -10,6 +10,13 @@ import { AuditLogTable } from './components/AuditLogTable'
 import { ModelInfoBar } from './components/ModelInfoBar'
 import { SegmentationOverlay } from './components/SegmentationOverlay'
 
+import { AICard } from './components/AICard'
+import { AICopilotDrawer } from './components/AICopilotDrawer'
+import { BatchProcessingPanel } from './components/BatchProcessingPanel'
+import { ModelZooPanel } from './components/ModelZooPanel'
+
+export type TabType = 'analysis' | 'copilot' | 'batch' | 'zoo' | 'history'
+
 export default function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null)
   const [loading, setLoading] = useState(false)
@@ -17,7 +24,14 @@ export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [auditRows, setAuditRows] = useState<AuditRow[]>([])
   const [selectedCell, setSelectedCell] = useState<CellInstance | null>(null)
-  const [activeTab, setActiveTab] = useState<'analysis' | 'history'>('analysis')
+  const [activeTab, setActiveTab] = useState<TabType>('analysis')
+
+  const handleReset = () => {
+    setResult(null)
+    setError(null)
+    setSelectedCell(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   // Fetch system health on mount
   useEffect(() => {
@@ -96,6 +110,28 @@ export default function App() {
         <div className="topbar-spacer" />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {result && (
+            <button
+              className="btn btn-secondary"
+              onClick={handleReset}
+              style={{
+                fontSize: 12,
+                padding: '6px 14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'var(--accent)',
+                color: '#090d16',
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+              }}
+            >
+              <Upload size={14} /> Upload Another Image
+            </button>
+          )}
+
           <span style={{
             fontSize: 11,
             color: 'var(--accent)',
@@ -120,13 +156,31 @@ export default function App() {
             className={`sidebar-item ${activeTab === 'analysis' ? 'active' : ''}`}
             onClick={() => setActiveTab('analysis')}
           >
-            <Activity /> Analysis Dashboard
+            <Activity /> Single Analysis
+          </div>
+          <div
+            className={`sidebar-item ${activeTab === 'copilot' ? 'active' : ''}`}
+            onClick={() => setActiveTab('copilot')}
+          >
+            <Bot /> Ask AI Copilot
+          </div>
+          <div
+            className={`sidebar-item ${activeTab === 'batch' ? 'active' : ''}`}
+            onClick={() => setActiveTab('batch')}
+          >
+            <FolderArchive /> Batch Processing
+          </div>
+          <div
+            className={`sidebar-item ${activeTab === 'zoo' ? 'active' : ''}`}
+            onClick={() => setActiveTab('zoo')}
+          >
+            <Cpu /> Model Zoo
           </div>
           <div
             className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`}
             onClick={() => setActiveTab('history')}
           >
-            <Database /> Audit History ({auditRows.length})
+            <Database /> Audit & Compliance ({auditRows.length})
           </div>
         </div>
 
@@ -163,19 +217,27 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'analysis' ? (
+        {activeTab === 'analysis' && (
           <>
             {/* Upload Area */}
-            <ImageUploader onUpload={handleUpload} loading={loading} />
+            <ImageUploader
+              onUpload={handleUpload}
+              loading={loading}
+              hasResult={!!result}
+              onReset={handleReset}
+            />
 
             {/* Results Grid */}
             {result && (
               <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {result.ai_insights && <AICard insights={result.ai_insights} />}
+
                 <CellMetricsPanel
                   cellCount={result.cell_count}
                   morphology={result.morphology}
                   calibration={result.calibration}
                   selectedCell={selectedCell}
+                  onReset={handleReset}
                 />
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -201,7 +263,21 @@ export default function App() {
               </div>
             )}
           </>
-        ) : (
+        )}
+
+        {activeTab === 'copilot' && (
+          <AICopilotDrawer analysisResult={result} />
+        )}
+
+        {activeTab === 'batch' && (
+          <BatchProcessingPanel />
+        )}
+
+        {activeTab === 'zoo' && (
+          <ModelZooPanel />
+        )}
+
+        {activeTab === 'history' && (
           <AuditLogTable rows={auditRows} onSelect={handleSelectAuditRow} />
         )}
       </main>

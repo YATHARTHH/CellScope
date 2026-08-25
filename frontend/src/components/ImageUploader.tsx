@@ -4,9 +4,11 @@ import { Upload, Microscope } from 'lucide-react'
 interface Props {
   onUpload: (file: File, pixelSizeUm: number | null) => void
   loading: boolean
+  hasResult?: boolean
+  onReset?: () => void
 }
 
-export function ImageUploader({ onUpload, loading }: Props) {
+export function ImageUploader({ onUpload, loading, hasResult, onReset }: Props) {
   const [dragOver, setDragOver] = useState(false)
   const [pixelSizeInput, setPixelSizeInput] = useState('')
   const [pixelSizeError, setPixelSizeError] = useState('')
@@ -29,12 +31,16 @@ export function ImageUploader({ onUpload, loading }: Props) {
       if (!files || files.length === 0) return
       const file = files[0]
       const ext = file.name.split('.').pop()?.toLowerCase()
-      if (!['tif', 'tiff', 'png'].includes(ext ?? '')) {
-        setPixelSizeError('Unsupported format. Use OME-TIFF, TIFF, or PNG.')
+      if (!['tif', 'tiff', 'png', 'jpg', 'jpeg'].includes(ext ?? '')) {
+        setPixelSizeError('Unsupported format. Use OME-TIFF, TIFF, PNG, or JPG.')
         return
       }
       const px = resolvePixelSize()
       onUpload(file, px)
+      // Reset input value so re-uploading the same or another file triggers onChange cleanly
+      if (inputRef.current) {
+        inputRef.current.value = ''
+      }
     },
     [onUpload, pixelSizeInput]
   )
@@ -50,8 +56,17 @@ export function ImageUploader({ onUpload, loading }: Props) {
 
   return (
     <div className="card">
-      <div className="card-header">
-        <span className="card-title">Upload Image</span>
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span className="card-title">Upload Microscopy Image</span>
+        {hasResult && onReset && (
+          <button
+            className="btn btn-secondary"
+            onClick={onReset}
+            style={{ fontSize: 12, padding: '4px 12px' }}
+          >
+            Clear / New Upload
+          </button>
+        )}
       </div>
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -98,7 +113,7 @@ export function ImageUploader({ onUpload, loading }: Props) {
                 Segmenting nuclei…
               </p>
               <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                This may take 30–90s on first run (model loading)
+                Executing StarDist 2D inference on local CPU
               </p>
             </div>
           ) : (
@@ -106,12 +121,14 @@ export function ImageUploader({ onUpload, loading }: Props) {
               <div className="uploader__icon">
                 <Microscope size={48} />
               </div>
-              <p className="uploader__title">Drop fluorescence image here</p>
+              <p className="uploader__title">
+                {hasResult ? 'Click or drop a new image to replace current analysis' : 'Drop fluorescence image here'}
+              </p>
               <p className="uploader__subtitle">
                 2D single-channel nuclear fluorescence (DAPI / Hoechst)
               </p>
               <div className="uploader__formats">
-                {['OME-TIFF', '.tif', '.tiff', '.png'].map(f => (
+                {['OME-TIFF', '.tif', '.tiff', '.png', '.jpg'].map(f => (
                   <span key={f} className="format-tag">{f}</span>
                 ))}
               </div>
@@ -123,13 +140,12 @@ export function ImageUploader({ onUpload, loading }: Props) {
           <input
             ref={inputRef}
             type="file"
-            accept=".tif,.tiff,.png"
+            accept=".tif,.tiff,.png,.jpg,.jpeg"
             style={{ display: 'none' }}
             onChange={e => handleFiles(e.target.files)}
             id="image-file-input"
           />
         </div>
-
       </div>
     </div>
   )

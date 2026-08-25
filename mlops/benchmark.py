@@ -2,14 +2,13 @@
 mlops/benchmark.py
 ------------------
 Benchmarks two models against the BBBC039v1 VALIDATION split:
-  1. StarDist pretrained  — '2D_versatile_fluo'
+  1. StarDist pretrained  — 'pretrained_versatile_fluo' (local weights)
   2. Cellpose baseline    — 'nuclei' model (Cellpose 3.x API)
 
 IMPORTANT:
   - ONLY the VALIDATION split is used here (not the test split).
   - The test split is reserved exclusively for final_eval.py.
   - Champion selection is based on validation metrics only.
-  - DSB2018 is noted as secondary non-independent benchmark (separate script).
 
 Outputs:
   metrics/pretrained_stardist.json
@@ -25,9 +24,9 @@ import numpy as np
 from csbdeep.utils import normalize
 from scipy.optimize import linear_sum_assignment
 from skimage.measure import label as sk_label
+from tqdm import tqdm
 import mlflow
 
-# ---------------------------------------------------------------------------
 PROC_DIR     = pathlib.Path("data/processed")
 METRICS_DIR  = pathlib.Path("metrics")
 METRICS_DIR.mkdir(parents=True, exist_ok=True)
@@ -38,25 +37,46 @@ EXPERIMENT   = "cellscope-benchmark-pretrained"
 VAL_SPLIT    = "val"   # NEVER use "test" here
 
 
-# ---------------------------------------------------------------------------
-# Instance matching: IoU-based one-to-one bipartite matching
-# ---------------------------------------------------------------------------
+def load_stardist_pretrained():
+    from stardist.models import StarDist2D
+    local_path = pathlib.Path("backend/models/pretrained_versatile_fluo")
+    if local_path.exists():
+        return StarDist2D(None, name="pretrained_versatile_fluo", basedir="backend/models")
+    return StarDist2D.from_pretrained("2D_versatile_fluo")
+
 
 def _instance_iou_matrix(pred: np.ndarray, gt: np.ndarray) -> np.ndarray:
-    """Compute IoU between every predicted and ground-truth instance pair."""
-    pred_ids = np.unique(pred)[1:]  # skip 0 (background)
+    """Vectorized IoU matrix using label histograms — O(H*W), not O(n^2 * H*W)."""
+    pred_ids = np.unique(pred)[1:]   # skip background 0
     gt_ids   = np.unique(gt)[1:]
-    if len(pred_ids) == 0 or len(gt_ids) == 0:
-        return np.zeros((len(pred_ids), len(gt_ids)), dtype=np.float32)
+    n_pred, n_gt = len(pred_ids), len(gt_ids)
+    if n_pred == 0 or n_gt == 0:
+        return np.zeros((n_pred, n_gt), dtype=np.float32)
 
-    iou_mat = np.zeros((len(pred_ids), len(gt_ids)), dtype=np.float32)
+    # Re-index labels to 1..n so we can use them as array indices
+    pred_remap = np.zeros(int(pred.max()) + 1, dtype=np.int32)
     for i, pid in enumerate(pred_ids):
-        p_mask = pred == pid
-        for j, gid in enumerate(gt_ids):
-            g_mask = gt == gid
-            intersection = np.logical_and(p_mask, g_mask).sum()
-            union        = np.logical_or(p_mask,  g_mask).sum()
-            iou_mat[i, j] = intersection / union if union > 0 else 0.0
+        pred_remap[pid] = i + 1
+    gt_remap = np.zeros(int(gt.max()) + 1, dtype=np.int32)
+    for j, gid in enumerate(gt_ids):
+        gt_remap[gid] = j + 1
+
+    pred_r = pred_remap[pred]   # shape H×W, values 0..n_pred
+    gt_r   = gt_remap[gt]       # shape H×W, values 0..n_gt
+
+    # Intersection: joint histogram over (pred_label, gt_label) pairs
+    # Encode pair as pred_r * (n_gt+1) + gt_r
+    flat = pred_r.ravel().astype(np.int64) * (n_gt + 1) + gt_r.ravel().astype(np.int64)
+    hist = np.bincount(flat, minlength=(n_pred + 1) * (n_gt + 1))
+    hist = hist.reshape(n_pred + 1, n_gt + 1)
+    intersection = hist[1:, 1:].astype(np.float32)  # n_pred × n_gt
+
+    # Areas from histogram margins
+    pred_area = hist[1:, :].sum(axis=1, keepdims=True)  # n_pred × 1
+    gt_area   = hist[:, 1:].sum(axis=0, keepdims=True)  # 1 × n_gt
+    union = pred_area + gt_area - intersection
+
+    iou_mat = np.where(union > 0, intersection / union, 0.0).astype(np.float32)
     return iou_mat
 
 
@@ -65,10 +85,6 @@ def compute_instance_metrics(
     gt: np.ndarray,
     iou_threshold: float = 0.5,
 ) -> dict:
-    """
-    IoU-based one-to-one bipartite matching (Hungarian algorithm).
-    Returns precision, recall, F1, mean_matched_iou.
-    """
     iou_mat = _instance_iou_matrix(pred, gt)
     if iou_mat.size == 0:
         n_pred = len(np.unique(pred)) - 1
@@ -79,7 +95,6 @@ def compute_instance_metrics(
             "mean_matched_iou": 0.0,
         }
 
-    # Hungarian matching (maximise sum of IoU)
     row_ind, col_ind = linear_sum_assignment(-iou_mat)
 
     tp, matched_ious = 0, []
@@ -107,7 +122,6 @@ def compute_instance_metrics(
 
 
 def average_precision(preds: list, gts: list, iou_thresholds=None) -> dict:
-    """Compute AP at multiple IoU thresholds via mean of per-threshold F1 proxy."""
     if iou_thresholds is None:
         iou_thresholds = np.arange(0.5, 0.95, 0.05)
 
@@ -130,7 +144,6 @@ def average_precision(preds: list, gts: list, iou_thresholds=None) -> dict:
 
 
 def count_metrics(preds: list, gts: list) -> dict:
-    """Compute count MAE, RMSE, relative error (normalized, scale-independent)."""
     pred_counts = np.array([len(np.unique(p)) - 1 for p in preds], dtype=float)
     gt_counts   = np.array([len(np.unique(g)) - 1 for g in gts],   dtype=float)
     diff = np.abs(pred_counts - gt_counts)
@@ -142,21 +155,15 @@ def count_metrics(preds: list, gts: list) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Benchmark runners
-# ---------------------------------------------------------------------------
-
 def benchmark_stardist(X_val: list, Y_val: list) -> dict:
-    """Evaluate pretrained StarDist 2D_versatile_fluo on validation split."""
-    from stardist.models import StarDist2D
-
-    print("  Loading StarDist pretrained '2D_versatile_fluo' ...")
-    model = StarDist2D.from_pretrained("2D_versatile_fluo")
+    """Evaluate pretrained StarDist 2D on validation split."""
+    print("  Loading StarDist pretrained model ...")
+    model = load_stardist_pretrained()
 
     preds, latencies = [], []
     tracemalloc.start()
 
-    for img in X_val:
+    for img in tqdm(X_val, desc="StarDist inference", unit="img"):
         t0 = time.perf_counter()
         labels, _ = model.predict_instances(img)
         latencies.append((time.perf_counter() - t0) * 1000)
@@ -168,7 +175,6 @@ def benchmark_stardist(X_val: list, Y_val: list) -> dict:
     ap_m  = average_precision(preds, Y_val)
     cnt_m = count_metrics(preds, Y_val)
 
-    # Per-image F1 and matched IoU at 0.5
     per_img = [compute_instance_metrics(p, g) for p, g in zip(preds, Y_val)]
     f1s     = [m["f1"] for m in per_img]
     mious   = [m["mean_matched_iou"] for m in per_img]
@@ -195,8 +201,7 @@ def benchmark_cellpose(X_val: list, Y_val: list) -> dict:
     preds, latencies = [], []
     tracemalloc.start()
 
-    for img in X_val:
-        # Cellpose expects uint8 or float; pass normalized float
+    for img in tqdm(X_val, desc="Cellpose inference", unit="img"):
         t0 = time.perf_counter()
         masks, _, _, _ = cp_model.eval([img], diameter=None, channels=[0, 0])
         latencies.append((time.perf_counter() - t0) * 1000)
@@ -224,14 +229,12 @@ def benchmark_cellpose(X_val: list, Y_val: list) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
 def load_split(split: str) -> tuple[list, list]:
     split_dir = pathlib.Path("data/processed") / split
-    X = list(np.load(str(split_dir / "images.npy"), allow_pickle=True))
-    Y = list(np.load(str(split_dir / "masks.npy"),  allow_pickle=True))
+    X_raw = np.load(str(split_dir / "images.npy"), allow_pickle=True)
+    Y_raw = np.load(str(split_dir / "masks.npy"),  allow_pickle=True)
+    X = [img.astype(np.float32) for img in X_raw]
+    Y = [mask.astype(np.uint16) for mask in Y_raw]
     return X, Y
 
 
@@ -244,7 +247,6 @@ def main() -> None:
     X_val, Y_val = load_split(VAL_SPLIT)
     print(f"  Loaded {len(X_val)} validation images.")
 
-    # --- StarDist ---
     print("\n[1/2] Benchmarking StarDist pretrained ...")
     sd_metrics = benchmark_stardist(X_val, Y_val)
     with open(METRICS_DIR / "pretrained_stardist.json", "w") as f:
@@ -254,7 +256,6 @@ def main() -> None:
           f"count_rel_err={sd_metrics['val_count_rel_error']:.3f}  "
           f"latency={sd_metrics['val_latency_ms_median']:.0f}ms")
 
-    # --- Cellpose ---
     print("\n[2/2] Benchmarking Cellpose 3.x ...")
     cp_metrics = benchmark_cellpose(X_val, Y_val)
     with open(METRICS_DIR / "cellpose_baseline.json", "w") as f:
@@ -264,7 +265,6 @@ def main() -> None:
           f"count_rel_err={cp_metrics['val_count_rel_error']:.3f}  "
           f"latency={cp_metrics['val_latency_ms_median']:.0f}ms")
 
-    # --- Log to MLflow ---
     try:
         mlflow.set_tracking_uri(MLFLOW_URI)
         mlflow.set_experiment(EXPERIMENT)
@@ -282,8 +282,7 @@ def main() -> None:
                     mlflow.log_metric(k, v)
         print("\n  Metrics logged to MLflow.")
     except Exception as e:
-        print(f"\n  WARNING: Could not log to MLflow ({e}). "
-              "Start MLflow server first: mlflow server --port 5000")
+        print(f"\n  WARNING: Could not log to MLflow ({e}).")
 
     print("\n  Benchmark complete.")
     print("  Run next: python mlops/gate.py")

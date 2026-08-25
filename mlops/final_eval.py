@@ -22,7 +22,7 @@ import tracemalloc
 import numpy as np
 import mlflow
 
-from benchmark import (
+from mlops.benchmark import (
     average_precision, count_metrics, compute_instance_metrics
 )
 
@@ -38,8 +38,10 @@ EXPERIMENT  = "cellscope-final-test-evaluation"
 
 def load_split(split: str) -> tuple[list, list]:
     split_dir = PROC_DIR / split
-    X = list(np.load(str(split_dir / "images.npy"), allow_pickle=True))
-    Y = list(np.load(str(split_dir / "masks.npy"),  allow_pickle=True))
+    X_raw = np.load(str(split_dir / "images.npy"), allow_pickle=True)
+    Y_raw = np.load(str(split_dir / "masks.npy"),  allow_pickle=True)
+    X = [img.astype(np.float32) for img in X_raw]
+    Y = [mask.astype(np.uint16) for mask in Y_raw]
     return X, Y
 
 

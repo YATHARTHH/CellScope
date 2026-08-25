@@ -26,12 +26,19 @@ export interface Morphology {
   density_cells_per_mm2: number | null
 }
 
+export interface AIInsights {
+  status: string
+  bullets: string[]
+  confidence_score: number
+}
+
 export interface AnalysisResult {
   analysis_id: string
   cell_count: number
   morphology: Morphology
   cells: CellInstance[]
   calibration: CalibrationInfo
+  ai_insights?: AIInsights
   segmentation_mask_b64: string
   annotated_image_b64: string
   inference_engine: string
@@ -54,6 +61,8 @@ export interface AuditRow {
   inference_time_ms: number
   model_version: string
   cache_hit: number
+  sha256_signature?: string
+  part11_verified?: boolean
 }
 
 export interface HealthStatus {

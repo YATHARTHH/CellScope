@@ -3,9 +3,10 @@ uvicorn[standard]>=0.29.0
 anyio>=4.3.0
 python-multipart>=0.0.9
 pillow>=10.2.0
-numpy>=1.24.0
+numpy<2.1,>=1.24.0
 scikit-image>=0.22.0
 tifffile>=2024.2.12
+tensorflow
 stardist>=0.9.1
 csbdeep>=0.8.1
 cellpose>=3.0.0,<4.0.0

@@ -133,13 +133,22 @@ html, body, #root {
 }
 
 /* ============================================================
-   Cards & Panels
+   Cards & Panels — Glassmorphism Design
    ============================================================ */
 .card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  background: rgba(12, 21, 32, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(74, 222, 128, 0.15);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.card:hover {
+  border-color: rgba(74, 222, 128, 0.3);
+  box-shadow: 0 12px 40px rgba(74, 222, 128, 0.08);
 }
 
 .card-header {
@@ -147,19 +156,43 @@ html, body, #root {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(17, 29, 46, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .card-title {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: 0.8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .card-body {
   padding: 20px;
+}
+
+/* Glassmorphism AI Insight Card */
+.ai-card {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.1) 0%, rgba(74, 222, 128, 0.08) 100%);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(167, 139, 250, 0.1);
+}
+
+.ai-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #a78bfa, #4ade80, #38bdf8);
 }
 
 /* ============================================================

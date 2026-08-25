@@ -20,7 +20,7 @@ import tracemalloc
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from benchmark import compute_instance_metrics, average_precision
+from mlops.benchmark import compute_instance_metrics, average_precision
 
 MODELS_DIR    = pathlib.Path("backend/models")
 METRICS_DIR   = pathlib.Path("metrics")

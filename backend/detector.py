@@ -75,8 +75,41 @@ class StarDistDetector:
                 None, name="stardist_finetuned", basedir=str(MODELS_DIR)
             )
         else:
-            self._model = StarDist2D.from_pretrained("2D_versatile_fluo")
+            local_path = MODELS_DIR / "pretrained_versatile_fluo"
+            if local_path.exists():
+                self._model = StarDist2D(
+                    None, name="pretrained_versatile_fluo", basedir=str(MODELS_DIR)
+                )
+            else:
+                self._model = StarDist2D.from_pretrained("2D_versatile_fluo")
         self._onnx_session = None
+
+    def switch_model(self, model_key: str) -> dict[str, Any]:
+        """Dynamically switch active model weights."""
+        from stardist.models import StarDist2D
+        if model_key == "stardist_finetuned":
+            self.champion = {
+                "model": "stardist_2D_finetuned",
+                "fine_tuned": True,
+                "source": "fine_tuned_bbbc039",
+            }
+            self._model = StarDist2D(None, name="stardist_finetuned", basedir=str(MODELS_DIR))
+        elif model_key == "stardist_pretrained":
+            self.champion = {
+                "model": "stardist_2D_versatile_fluo",
+                "fine_tuned": False,
+                "source": "pretrained",
+            }
+            local_path = MODELS_DIR / "pretrained_versatile_fluo"
+            if local_path.exists():
+                self._model = StarDist2D(None, name="pretrained_versatile_fluo", basedir=str(MODELS_DIR))
+            else:
+                self._model = StarDist2D.from_pretrained("2D_versatile_fluo")
+        else:
+            raise ValueError(f"Unknown model key: {model_key}")
+        
+        self.engine = "native_tf"
+        return self.champion
 
     def _load_onnx(self) -> None:
         import onnxruntime as ort
@@ -92,7 +125,13 @@ class StarDistDetector:
                 None, name="stardist_finetuned", basedir=str(MODELS_DIR)
             )
         else:
-            self._model = StarDist2D.from_pretrained("2D_versatile_fluo")
+            local_path = MODELS_DIR / "pretrained_versatile_fluo"
+            if local_path.exists():
+                self._model = StarDist2D(
+                    None, name="pretrained_versatile_fluo", basedir=str(MODELS_DIR)
+                )
+            else:
+                self._model = StarDist2D.from_pretrained("2D_versatile_fluo")
 
     @property
     def model_version(self) -> str:
@@ -153,7 +192,6 @@ class StarDistDetector:
 # Overlay rendering — used by the API endpoint
 # ---------------------------------------------------------------------------
 
-# Perceptually distinct colors for up to 256 instances
 _PALETTE = [
     (0x4e, 0xd7, 0x6a),  # GFP green
     (0x38, 0xbd, 0xf8),  # sky blue
@@ -171,11 +209,6 @@ def render_overlay(
     labels: np.ndarray,
     alpha: float = 0.45,
 ) -> str:
-    """
-    Renders a coloured segmentation overlay on top of the grayscale image.
-    Returns base64-encoded PNG string.
-    """
-    # Normalise to 0–255 for display
     img_display = img_raw - img_raw.min()
     max_val = img_display.max()
     if max_val > 0:
@@ -206,10 +239,6 @@ def render_overlay(
 
 
 def render_mask_image(labels: np.ndarray) -> str:
-    """
-    Renders a pure segmentation mask image (coloured instances, black background).
-    Returns base64-encoded PNG string.
-    """
     h, w   = labels.shape
     canvas = Image.new("RGB", (w, h), (0, 0, 0))
     pixels = np.array(canvas)

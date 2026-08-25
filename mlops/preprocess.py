@@ -8,7 +8,7 @@ Key design decisions:
   - Uses the OFFICIAL BBBC039 partitions (not a custom split) so results
     are comparable across studies.
   - Normalization: percentile 1.0–99.8 per image (matches StarDist 2D_versatile_fluo).
-  - Saves processed numpy arrays as compressed .npz files per split.
+  - Saves processed numpy arrays as compressed .npy files per split.
   - Mask labels are uint16 instance IDs (each nucleus = unique integer).
 """
 
@@ -30,37 +30,30 @@ MASK_DIR  = RAW_DIR / "masks"
 def load_official_partitions() -> dict[str, list[str]]:
     """
     Load the official BBBC039 train/val/test partition CSV files.
-    Returns a dict: {"train": [...], "val": [...], "test": [...]}
+    Searches recursively in META_DIR for partition files.
     """
     partitions: dict[str, list[str]] = {}
 
-    # BBBC039 provides partition CSVs in the metadata folder
-    # File names may vary: train.txt, validation.txt, test.txt or similar
     for split_name, possible_names in [
-        ("train",      ["train.txt", "training.txt", "train.csv"]),
+        ("train",      ["training.txt", "train.txt", "train.csv"]),
         ("val",        ["validation.txt", "val.txt", "validation.csv"]),
         ("test",       ["test.txt", "testing.txt", "test.csv"]),
     ]:
+        found_file = None
         for fname in possible_names:
-            fpath = META_DIR / fname
-            if fpath.exists():
-                with open(fpath) as f:
-                    names = [line.strip() for line in f if line.strip()]
-                partitions[split_name] = names
-                print(f"  [{split_name}] {len(names)} FOVs from {fname}")
+            matches = [f for f in META_DIR.rglob(fname) if "__MACOSX" not in str(f)]
+            if matches:
+                found_file = matches[0]
                 break
+
+        if found_file:
+            with open(found_file) as f:
+                names = [line.strip() for line in f if line.strip()]
+            partitions[split_name] = names
+            print(f"  [{split_name}] {len(names)} FOVs loaded from {found_file.relative_to(RAW_DIR)}")
         else:
-            # Fallback: scan metadata directory for any matching file
-            found = list(META_DIR.glob(f"*{split_name}*"))
-            if found:
-                with open(found[0]) as f:
-                    names = [line.strip() for line in f if line.strip()]
-                partitions[split_name] = names
-                print(f"  [{split_name}] {len(names)} FOVs from {found[0].name}")
-            else:
-                print(f"  WARNING: No partition file found for '{split_name}'. "
-                      f"Files in metadata/: {[f.name for f in META_DIR.iterdir()]}")
-                partitions[split_name] = []
+            print(f"  WARNING: No partition file found for '{split_name}'.")
+            partitions[split_name] = []
 
     return partitions
 
@@ -68,12 +61,7 @@ def load_official_partitions() -> dict[str, list[str]]:
 def find_image(stem: str) -> pathlib.Path | None:
     """Find an image file by stem (without extension) in IMG_DIR."""
     for ext in [".tif", ".tiff", ".png"]:
-        p = IMG_DIR / (stem + ext)
-        if p.exists():
-            return p
-    # Recursive search if not in root
-    for ext in [".tif", ".tiff", ".png"]:
-        matches = list(IMG_DIR.rglob(stem + ext))
+        matches = [f for f in IMG_DIR.rglob(stem + ext) if "__MACOSX" not in str(f)]
         if matches:
             return matches[0]
     return None
@@ -82,11 +70,7 @@ def find_image(stem: str) -> pathlib.Path | None:
 def find_mask(stem: str) -> pathlib.Path | None:
     """Find a mask file by stem in MASK_DIR."""
     for ext in [".png", ".tif", ".tiff"]:
-        p = MASK_DIR / (stem + ext)
-        if p.exists():
-            return p
-    for ext in [".png", ".tif", ".tiff"]:
-        matches = list(MASK_DIR.rglob(stem + ext))
+        matches = [f for f in MASK_DIR.rglob(stem + ext) if "__MACOSX" not in str(f)]
         if matches:
             return matches[0]
     return None
@@ -96,7 +80,6 @@ def load_image(path: pathlib.Path) -> np.ndarray:
     """Load a single-channel fluorescence image as float32."""
     img = tifffile.imread(str(path)).astype(np.float32)
     if img.ndim == 3:
-        # Take first channel if multi-channel (should not happen for BBBC039)
         img = img[0]
     return img
 
@@ -109,14 +92,14 @@ def load_mask(path: pathlib.Path) -> np.ndarray:
     """
     mask = skio.imread(str(path))
     if mask.ndim == 3:
-        mask = mask[..., 0]  # take first channel
+        mask = mask[..., 0]
     mask = (mask > 0).astype(np.uint8)
     labeled = sk_label(mask).astype(np.uint16)
     return labeled
 
 
 def process_split(split_name: str, file_stems: list[str]) -> None:
-    """Normalize images and save processed split as .npz."""
+    """Normalize images and save processed split."""
     if not file_stems:
         print(f"  [{split_name}] Skipping — no files listed.")
         return
@@ -128,7 +111,6 @@ def process_split(split_name: str, file_stems: list[str]) -> None:
     missing = []
 
     for stem in file_stems:
-        # Strip extension if present in partition file
         stem = pathlib.Path(stem).stem
 
         img_path  = find_image(stem)
@@ -149,18 +131,17 @@ def process_split(split_name: str, file_stems: list[str]) -> None:
         loaded_names.append(stem)
 
     if missing:
-        print(f"  [{split_name}] WARNING: {len(missing)} files not found: {missing[:5]}")
+        print(f"  [{split_name}] WARNING: {len(missing)} files not found (showing up to 5): {missing[:5]}")
 
     if not loaded_images:
         print(f"  [{split_name}] No images loaded — skipping save.")
         return
 
-    # Save as object arrays (images may have different sizes)
     np.save(str(out_dir / "images.npy"),  np.array(loaded_images, dtype=object), allow_pickle=True)
     np.save(str(out_dir / "masks.npy"),   np.array(loaded_masks,  dtype=object), allow_pickle=True)
     np.save(str(out_dir / "names.npy"),   np.array(loaded_names,  dtype=object), allow_pickle=True)
 
-    print(f"  [{split_name}] Saved {len(loaded_images)} images to {out_dir}")
+    print(f"  [{split_name}] Processed & saved {len(loaded_images)} fields of view to {out_dir}")
 
 
 def main() -> None:
@@ -177,7 +158,6 @@ def main() -> None:
         stems = partitions.get(split, [])
         process_split(split, stems)
 
-    # Save partition summary for reproducibility
     summary = {k: len(v) for k, v in partitions.items()}
     with open(PROC_DIR / "partition_summary.json", "w") as f:
         json.dump(summary, f, indent=2)

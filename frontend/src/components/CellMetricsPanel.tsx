@@ -6,6 +6,7 @@ interface Props {
   morphology: Morphology
   calibration: CalibrationInfo
   selectedCell?: CellInstance | null
+  onReset?: () => void
 }
 
 export function CellMetricsPanel({
@@ -13,14 +14,17 @@ export function CellMetricsPanel({
   morphology,
   calibration,
   selectedCell,
+  onReset,
 }: Props) {
   const isCalibrated = calibration.calibrated
 
   return (
     <div className="card" id="cell-metrics-panel">
-      <div className="card-header">
-        <span className="card-title">Quantitative Summary</span>
-        <CalibrationBadge calibration={calibration} />
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="card-title">Quantitative Summary</span>
+          <CalibrationBadge calibration={calibration} />
+        </div>
       </div>
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Primary Stat Tiles */}
